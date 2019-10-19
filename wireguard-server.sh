@@ -1,6 +1,34 @@
 #!/bin/bash
 # Secure WireGuard For CentOS, Debian, Ubuntu, Raspbian, Arch, Fedora, Redhat
 
+# settings overrides for non-interactive install
+export INTERACTIVE="n"
+export PORT_CHOICE="1"
+export NAT_CHOICE="1"
+export MTU_CHOICE="1"
+export SERVER_HOST="1"
+export DISABLE_HOST="1"
+export CLIENT_ALLOWED_IP="1"
+export INSTALL_PIHOLE="y"
+export CLIENT_NAME="mobile"
+
+# preconfigure pihole for non-interactive install
+INTERNAL_IP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
+mkdir -p /etc/pihole
+echo "PIHOLE_INTERFACE=eth0
+DNSMASQ_LISTENING=all
+IPV4_ADDRESS=$INTERNAL_IP/32
+IPV6_ADDRESS=
+PIHOLE_DNS_1=8.8.8.8
+PIHOLE_DNS_2=8.8.4.4
+QUERY_LOGGING=true
+INSTALL_WEB_SERVER=true
+INSTALL_WEB_INTERFACE=true
+LIGHTTPD_ENABLED=true
+BLOCKING_ENABLED=true
+WEBPASSWORD=5536c470d038c11793b535e8c1176817c001d6f20a4704fa7908939be82e2922" >/etc/pihole/setupVars.conf
+
+
 # Check Root Function
 function root-check() {
   if [[ "$EUID" -ne 0 ]]; then
@@ -200,7 +228,7 @@ if [ ! -f "$WG_CONFIG" ]; then
       ;;
     3)
       until [[ "$NAT_CHOICE " =~ ^[0-9]+$ ]] && [ "$NAT_CHOICE " -ge 1 ] && [ "$NAT_CHOICE " -le 25 ]; do
-        read -rp "Custom NAT [0-25]: " -e -i 25 NA_CHOICE
+        read -rp "Custom NAT [0-25]: " -e -i 25 NAT_CHOICE
       done
       ;;
     esac
@@ -327,7 +355,7 @@ if [ ! -f "$WG_CONFIG" ]; then
   }
 
   # Ask To Install DNS
-  ask-install-dns
+  # ask-install-dns
 
   # What would you like to name your first WireGuard peer?
   function client-name() {
@@ -336,7 +364,7 @@ if [ ! -f "$WG_CONFIG" ]; then
   }
 
   # Client Name
-  client-name
+  # client-name
 
   # Install WireGuard Server
 function install-wireguard-server() {
@@ -536,7 +564,8 @@ fi
   # Install Pi-Hole
   function install-pihole() {
   if [ "$INSTALL_PIHOLE" = "y" ]; then
-    curl -sSL https://install.pi-hole.net | bash
+    # curl -sSL https://install.pi-hole.net | bash
+    curl -L https://install.pi-hole.net | bash /dev/stdin --unattended
   fi
     # Set Client DNS
     CLIENT_DNS="10.8.0.1"
@@ -547,7 +576,8 @@ fi
 
   # Set correct time
   function set-correct-time() {
-  dpkg-reconfigure tzdata
+  sudo ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime
+  sudo dpkg-reconfigure -f noninteractive tzdata
   }
 
   # Run the function
@@ -589,7 +619,7 @@ DNS = $CLIENT_DNS
 MTU = $MTU_CHOICE
 PrivateKey = $CLIENT_PRIVKEY
 [Peer]
-AllowedIPs = $CLIENT_ALLOWED_IP
+AllowedIPs = $CLIENT_DNS
 Endpoint = $SERVER_HOST:$SERVER_PORT
 PersistentKeepalive = $NAT_CHOICE
 PresharedKey = $PRESHARED_KEY
@@ -682,7 +712,7 @@ DNS = $CLIENT_DNS
 MTU = $MTU_CHOICE
 PrivateKey = $CLIENT_PRIVKEY
 [Peer]
-AllowedIPs = $CLIENT_ALLOWED_IP
+AllowedIPs = $CLIENT_DNS
 Endpoint = $SERVER_HOST$SERVER_PORT
 PersistentKeepalive = $NAT_CHOICE
 PresharedKey = $PRESHARED_KEY
